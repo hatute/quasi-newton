@@ -26,7 +26,7 @@ def plot_contour_2d(
     """
     # Create figure
     fig, ax = plt.subplots(1, 1, figsize=figsize)
-    levels = np.logspace(0, 2.5, 10)
+    levels = np.logspace(0, 1.5, 20)
     # Create a grid for the contour plot
     x_min, x_max = x_range
     y_min, y_max = y_range
@@ -419,17 +419,13 @@ def plot_individual_contours(
         plt.close()
 
 
-def rosenbrock(x):
+def rosenbrock(x,a=1.0, b=10.0):
     """Rosenbrock function: f(x,y) = (a-x)^2 + b(y-x^2)^2"""
-    a = 1.0
-    b = 100.0
     return (a - x[0]) ** 2 + b * (x[1] - x[0] ** 2) ** 2
 
 
-def rosenbrock_gradient(x):
+def rosenbrock_gradient(x, a=1.0, b=10.0):
     """Gradient of the Rosenbrock function"""
-    a = 1.0
-    b = 100.0
     dx = -2 * (a - x[0]) - 4 * b * x[0] * (x[1] - x[0] ** 2)
     dy = 2 * b * (x[1] - x[0] ** 2)
     return np.array([dx, dy])
@@ -438,21 +434,33 @@ def rosenbrock_gradient(x):
 if __name__ == "__main__":
     import bfgs as bfgs
     import lbfgs as lbfgs
+    import newton as newton
     initial_point = np.array([-1.5, 2.0])
 
-    # optimizer = bfgs.BFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
-    # optimal_point, optimal_value, history_x, history_f = optimizer.optimize(
-    #     initial_point
-    # )
-    # fig, ax = plot_contour_2d(
-    #     history_x, rosenbrock, "BFGS", x_range=(-2, 2), y_range=(-1, 3), figsize=(12, 8)
-    # )
+    optimizer = bfgs.BFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
+    optimal_point, optimal_value, history_x, history_f = optimizer.optimize(
+        initial_point
+    )
+    fig, ax = plot_contour_2d(
+        history_x, rosenbrock, "BFGS"
+    )
 
     optimizer = lbfgs.LBFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
     optimal_point, optimal_value, history_x, history_f = optimizer.optimize(
         initial_point
     )
     fig, ax = plot_contour_2d(
-        history_x, rosenbrock, "L-BFGS", x_range=(-2, 2), y_range=(-1, 3), figsize=(12, 8)
+        history_x,
+        rosenbrock,
+        "L-BFGS",
     )
+
+    optimizer = newton.Newton(rosenbrock, rosenbrock_gradient, max_iter=100)
+    optimal_point, optimal_value, history_x, history_f = optimizer.optimize(
+        initial_point
+    )
+    fig, ax = plot_contour_2d(
+        history_x, rosenbrock, "Newton's Method"
+    )
+
     plt.show()
