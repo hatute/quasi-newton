@@ -1,14 +1,25 @@
 import time
+from pathlib import Path
 from typing import Callable, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from matplotlib import cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+import bfgs as bfgs
+import lbfgs as lbfgs
+import newton as newton
 
 
 def plot_contour_2d(
-    history_x, f_contour, f_name, x_range=(-2, 2), y_range=(-1, 3), figsize=(12, 8)
+    history_x,
+    f_contour,
+    f_name,
+    x_range=(-2, 2),
+    y_range=(-1, 3),
+    figsize=(12, 8),
+    save=True,
 ):
     """
     Plot optimization path on Rosenbrock function contour plot.
@@ -87,380 +98,416 @@ def plot_contour_2d(
     ax.spines["right"].set_visible(True)
 
     plt.tight_layout()
+    if save:
+        save_path = f"./figures/{f_name}_2dcontour.png"
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
     return fig, ax
 
 
-def plot_convergence_history(history_f, figsize=(10, 6)):
+def plot_loss_comparison(
+    results: dict,
+    title: str = "Optimization Convergence Comparison",
+    xlabel: str = "Iteration",
+    ylabel: str = "Loss",
+    log_scale: bool = False,
+    figsize: Tuple[int, int] = (12, 8),
+    save_path: str = None,
+    show_convergence_rate: bool = True,
+) -> None:
     """
-    Plot convergence history of the optimization.
+    Advanced plotting function with additional features like convergence rate visualization.
 
-    Args:
-        history_f: List of function values during optimization
-        figsize: Figure size as (width, height)
-
-    Returns:
-        fig, ax: Matplotlib figure and axis objects
+    Parameters:
+    -----------
+    results : dict
+        Dictionary with keys as algorithm names and values as optimization results
+        Example: {'BFGS': bfgs_result, 'Newton': newton_result, 'L-BFGS': lbfgs_result}
     """
-    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    sns.set_style("whitegrid")
 
-    iterations = range(len(history_f))
-    ax.semilogy(iterations, history_f, "b-", linewidth=2.5, marker="o", markersize=6)
+    if show_convergence_rate:
+        fig, (ax1, ax2) = plt.subplots(
+            2, 1, figsize=figsize, height_ratios=[3, 1], sharex=True
+        )
+    else:
+        fig, ax1 = plt.subplots(1, 1, figsize=figsize)
 
-    ax.set_xlabel("Iteration", fontsize=14)
-    ax.set_ylabel("Function Value (log scale)", fontsize=14)
-    ax.set_title("Convergence History of BFGS on Rosenbrock Function", fontsize=16)
-    ax.grid(True, alpha=0.3, which="both")
+    colors = {"BFGS": "blue", "Newton": "red", "L-BFGS": "green"}
+    markers = {"BFGS": "o", "Newton": "s", "L-BFGS": "^"}
 
-    # Add annotation for final value
-    ax.annotate(
-        f"Final value: {history_f[-1]:.6f}",
-        xy=(len(history_f) - 1, history_f[-1]),
-        xytext=(len(history_f) - 5, history_f[-1] * 10),
-        arrowprops=dict(arrowstyle="->", color="red"),
-        fontsize=12,
+    # Main loss plot
+    for name, result in results.items():
+        _, _, _, loss_history = result
+        iterations = list(range(len(loss_history)))
+
+        ax1.plot(
+            iterations,
+            loss_history,
+            label=name,
+            marker=markers.get(name, "o"),
+            markersize=4,
+            linewidth=1,
+            color=colors.get(name, "black"),
+            alpha=0.8,
+        )
+
+    ax1.set_title(title, fontsize=16, fontweight="bold", pad=20)
+    ax1.set_ylabel(ylabel, fontsize=10)
+    ax1.legend(fontsize=12, loc="upper right")
+    ax1.grid(True, alpha=0.3)
+
+    if log_scale:
+        ax1.set_yscale("log")
+    ax1.text(
+        -0.05,
+        1.05,
+        "A",
+        transform=ax1.transAxes,
+        fontsize=16,
+        fontweight="bold",
+        va="top",
+        ha="right",
     )
+
+    # Remove x-axis label from the top plot
+    # if show_convergence_rate:
+    #     ax1.set_xticklabels([])
+    # else:
+    #     ax1.set_xlabel(xlabel, fontsize=14)
+
+    # Convergence rate plot
+    if show_convergence_rate:
+        for name, result in results.items():
+            _, _, _, loss_history = result
+            if len(loss_history) > 1:
+                rates = []
+                for i in range(1, len(loss_history)):
+                    if loss_history[i - 1] != 0:
+                        rate = abs(loss_history[i] - loss_history[i - 1]) / abs(
+                            loss_history[i - 1]
+                        )
+                        rates.append(rate)
+                    else:
+                        rates.append(0)
+
+                iterations = list(range(1, len(loss_history)))
+                ax2.plot(
+                    iterations,
+                    rates,
+                    label=name,
+                    marker=markers.get(name, "o"),
+                    markersize=3,
+                    linewidth=1,
+                    color=colors.get(name, "black"),
+                    alpha=0.7,
+                )
+
+        ax2.set_xlabel(xlabel, fontsize=14)
+        ax2.set_ylabel("Relative Change", fontsize=10)
+        ax2.set_yscale("log")
+        ax2.legend(fontsize=10, loc="lower right")
+        ax2.grid(True, alpha=0.3)
+        ax2.text(
+            -0.05,
+            1.05,
+            "B",
+            transform=ax2.transAxes,
+            fontsize=16,
+            fontweight="bold",
+            va="top",
+            ha="right",
+        )
 
     plt.tight_layout()
 
-    return fig, ax
+    if save_path:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    plt.show()
 
 
-def plot_2d_contour(
-    f: Callable,
-    x_range: Tuple[float, float],
-    y_range: Tuple[float, float],
-    optimizers: Dict[str, List[np.ndarray]],
-    title: str = "Optimization Paths on 2D Contour",
-    n_points: int = 100,
-    ax=None,
-):
+def create_quadratic_problem(n_dim: int) -> Tuple[callable, callable, callable]:
     """
-    Plot 2D contour with optimization paths.
+    Create a quadratic optimization problem in n dimensions.
+    f(x) = 0.5 * x^T * Q * x + b^T * x
 
     Args:
+        n_dim: Dimension of the problem
+
+    Returns:
         f: Objective function
-        x_range: Range for x-axis
-        y_range: Range for y-axis
-        optimizers: Dictionary of optimizer name to path history
-        title: Plot title
-        n_points: Number of points for contour
-        ax: Optional matplotlib axis to plot on
+        grad_f: Gradient function
+        hess_f: Hessian function
     """
-    x = np.linspace(x_range[0], x_range[1], n_points)
-    y = np.linspace(y_range[0], y_range[1], n_points)
-    X, Y = np.meshgrid(x, y)
-    Z = np.zeros_like(X)
+    # Generate a random positive definite matrix Q
+    A = np.random.randn(n_dim, n_dim)
+    Q = A.T @ A + 0.1 * np.eye(n_dim)  # Ensure positive definiteness
+    b = np.random.randn(n_dim)
 
-    for i in range(n_points):
-        for j in range(n_points):
-            Z[i, j] = f(np.array([X[i, j], Y[i, j]]))
+    def f(x):
+        return 0.5 * x.T @ Q @ x + b.T @ x
 
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(10, 8))
-    else:
-        fig = ax.figure
+    def grad_f(x):
+        return Q @ x + b
 
-    # Plot contour
-    contour = ax.contour(X, Y, Z, levels=20, colors="black", alpha=0.5, linewidths=0.5)
-    contourf = ax.contourf(X, Y, Z, levels=20, cmap="gray", alpha=0.7)
+    def hess_f(x):
+        return Q
 
-    # Add colorbar if creating a new figure
-    if ax is None:
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.1)
-        plt.colorbar(contourf, cax=cax)
-
-    # Plot optimization paths
-    colors = ["green", "red", "blue", "orange", "purple"]
-    markers = ["o", "s", "^", "D", "v"]
-
-    for (name, path), color, marker in zip(optimizers.items(), colors, markers):
-        path = np.array(path)
-        ax.plot(
-            path[:, 0], path[:, 1], "-", color=color, alpha=0.7, linewidth=2, label=name
-        )
-        ax.scatter(path[:, 0], path[:, 1], color=color, marker=marker, s=30)
-        # Mark starting point
-        ax.scatter(
-            path[0, 0],
-            path[0, 1],
-            color=color,
-            marker=marker,
-            s=100,
-            edgecolor="black",
-            linewidth=2,
-        )
-        # Mark ending point
-        ax.scatter(
-            path[-1, 0],
-            path[-1, 1],
-            color=color,
-            marker=marker,
-            s=100,
-            edgecolor="white",
-            linewidth=2,
-        )
-
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_title(title)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    return fig, ax
+    return f, grad_f, hess_f
 
 
-def plot_loss_trends(
-    optimizers: Dict[str, List[float]],
-    title: str = "Loss Trends Comparison",
-    log_scale: bool = True,
-    ax=None,
-):
+def benchmark_optimizers(
+    dimensions: List[int], n_trials: int = 5, max_iter: int = 100
+) -> Dict[str, Dict[int, List[float]]]:
     """
-    Plot loss trends for different optimizers.
+    Benchmark the three optimizers across different dimensions.
 
     Args:
-        optimizers: Dictionary of optimizer name to loss history
-        title: Plot title
-        log_scale: Whether to use log scale for y-axis
-        ax: Optional matplotlib axis to plot on
+        dimensions: List of dimensions to test
+        n_trials: Number of trials per dimension
+        max_iter: Maximum iterations for optimizers
+
+    Returns:
+        Dictionary containing runtime data for each optimizer
     """
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(10, 6))
-    else:
-        fig = ax.figure
-
-    colors = ["green", "red", "blue", "orange", "purple"]
-
-    for (name, losses), color in zip(optimizers.items(), colors):
-        ax.plot(losses, "-", color=color, linewidth=2, label=name)
-
-    if log_scale:
-        ax.set_yscale("log")
-
-    ax.set_xlabel("Iteration")
-    ax.set_ylabel("Loss" + (" (log scale)" if log_scale else ""))
-    ax.set_title(title)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    return fig, ax
-
-
-def plot_time_vs_loss(
-    optimizers: Dict[str, Tuple[List[float], List[float]]],
-    title: str = "Running Time vs Loss",
-    log_scale: bool = True,
-    ax=None,
-):
-    """
-    Plot running time vs loss for different optimizers.
-
-    Args:
-        optimizers: Dictionary of optimizer name to (time_history, loss_history)
-        title: Plot title
-        log_scale: Whether to use log scale for y-axis
-        ax: Optional matplotlib axis to plot on
-    """
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(10, 6))
-    else:
-        fig = ax.figure
-
-    colors = ["green", "red", "blue", "orange", "purple"]
-
-    for (name, (times, losses)), color in zip(optimizers.items(), colors):
-        ax.plot(times, losses, "-", color=color, linewidth=2, label=name)
-
-    if log_scale:
-        ax.set_yscale("log")
-
-    ax.set_xlabel("Time (seconds)")
-    ax.set_ylabel("Loss" + (" (log scale)" if log_scale else ""))
-    ax.set_title(title)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    return fig, ax
-
-
-def plot_memory_usage(
-    optimizers: Dict[str, List[float]], title: str = "Memory Usage Comparison", ax=None
-):
-    """
-    Plot memory usage for different optimizers.
-
-    Args:
-        optimizers: Dictionary of optimizer name to memory usage history
-        title: Plot title
-        ax: Optional matplotlib axis to plot on
-    """
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(10, 6))
-    else:
-        fig = ax.figure
-
-    colors = ["green", "red", "blue", "orange", "purple"]
-
-    for (name, memory), color in zip(optimizers.items(), colors):
-        ax.plot(memory, "-", color=color, linewidth=2, label=name)
-
-    ax.set_xlabel("Iteration")
-    ax.set_ylabel("Memory Usage (MB)")
-    ax.set_title(title)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    return fig, ax
-
-
-def plot_all_comparisons(
-    results: Dict[str, Dict],
-    f: Callable,
-    x_range: Tuple[float, float] = (-6, 0),
-    y_range: Tuple[float, float] = (0, 6),
-    save_path: str = None,
-):
-    """
-    Plot all comparisons in a single figure.
-
-    Args:
-        results: Dictionary of optimizer results
-        f: Objective function for contour plotting
-        x_range: Range for x-axis in contour plot
-        y_range: Range for y-axis in contour plot
-        save_path: Path to save the figure
-    """
-    fig = plt.figure(figsize=(16, 20))
-
-    # 1. 2D Contour Plots
-    ax1 = fig.add_subplot(4, 1, 1)
-    optimizers_paths = {name: res["history_x"] for name, res in results.items()}
-    _, _ = plot_2d_contour(f, x_range, y_range, optimizers_paths, n_points=100, ax=ax1)
-
-    # 2. Loss Trends
-    ax2 = fig.add_subplot(4, 1, 2)
-    optimizers_losses = {name: res["history_f"] for name, res in results.items()}
-    _, _ = plot_loss_trends(optimizers_losses, ax=ax2)
-
-    # 3. Time vs Loss
-    ax3 = fig.add_subplot(4, 1, 3)
-    optimizers_time_loss = {
-        name: (res["time_history"], res["history_f"])
-        for name, res in results.items()
-        if "time_history" in res
+    results = {
+        "Newton": {dim: [] for dim in dimensions},
+        "BFGS": {dim: [] for dim in dimensions},
+        "L-BFGS": {dim: [] for dim in dimensions},
     }
-    _, _ = plot_time_vs_loss(optimizers_time_loss, ax=ax3)
 
-    # 4. Memory Usage
-    ax4 = fig.add_subplot(4, 1, 4)
-    optimizers_memory = {
-        name: res["memory_usage"]
-        for name, res in results.items()
-        if "memory_usage" in res
-    }
-    if optimizers_memory:  # Only plot if there's memory data
-        _, _ = plot_memory_usage(optimizers_memory, ax=ax4)
-    else:
-        ax4.text(
-            0.5,
-            0.5,
-            "No memory usage data available",
-            horizontalalignment="center",
-            verticalalignment="center",
-            transform=ax4.transAxes,
+    for dim in dimensions:
+        print(f"Testing dimension: {dim}")
+
+        for trial in range(n_trials):
+            # Create problem
+            f, grad_f, hess_f = create_quadratic_problem(dim)
+            x0 = np.random.randn(dim)
+
+            # Newton
+            optimizer = newton.Newton(f, grad_f, hess_f, max_iter=max_iter)
+            start_time = time.time()
+            optimizer.optimize(x0, return_history=False)
+            newton_time = time.time() - start_time
+            results["Newton"][dim].append(newton_time)
+
+            # BFGS
+            optimizer = bfgs.BFGS(f, grad_f, max_iter=max_iter)
+            start_time = time.time()
+            optimizer.optimize(x0, return_history=False)
+            bfgs_time = time.time() - start_time
+            results["BFGS"][dim].append(bfgs_time)
+
+            # L-BFGS
+            optimizer = lbfgs.LBFGS(f, grad_f, max_iter=max_iter)
+            start_time = time.time()
+            optimizer.optimize(x0, return_history=False)
+            lbfgs_time = time.time() - start_time
+            results["L-BFGS"][dim].append(lbfgs_time)
+
+    return results
+
+
+def plot_runtime_comparison(
+    results: Dict[str, Dict[int, List[float]]], save_path: str = None
+):
+    """
+    Plot runtime comparison with error bars.
+
+    Args:
+        results: Runtime results from benchmark_optimizers
+        save_path: Path to save the figure (optional)
+    """
+    plt.figure(figsize=(12, 8))
+
+    # Set style
+    sns.set_style("whitegrid")
+    sns.set_palette("husl")
+
+    # Extract data
+    dimensions = sorted(next(iter(results.values())).keys())
+
+    # Plot with error bars
+    for algorithm, data in results.items():
+        means = [np.mean(data[dim]) for dim in dimensions]
+        stds = [np.std(data[dim]) for dim in dimensions]
+
+        plt.errorbar(
+            dimensions,
+            means,
+            yerr=stds,
+            label=algorithm,
+            marker="o",
+            capsize=5,
+            linewidth=2,
+            markersize=8,
+            alpha=0.8,
         )
-        ax4.set_title("Memory Usage Comparison")
+
+    plt.xlabel("Dimension", fontsize=14)
+    plt.ylabel("Runtime (seconds)", fontsize=14)
+    plt.title("Runtime Comparison of Optimization Algorithms", fontsize=16, pad=20)
+    plt.legend(fontsize=12)
+    plt.grid(True, alpha=0.3)
+
+    # Set logarithmic scale if the range is large
+    if max(dimensions) / min(dimensions) > 10:
+        plt.xscale("log")
+        plt.yscale("log")
 
     plt.tight_layout()
 
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
-    return fig
+    plt.show()
 
 
-def plot_individual_contours(
-    f: Callable,
-    x_range: Tuple[float, float],
-    y_range: Tuple[float, float],
-    optimizers: Dict[str, List[np.ndarray]],
-    save_prefix: str = None,
-    n_points: int = 100,
+def plot_runtime_scaling(
+    results: Dict[str, Dict[int, List[float]]], save_path: str = None
 ):
     """
-    Plot individual contour plots for each optimizer.
+    Plot runtime scaling with theoretical complexity lines.
 
     Args:
-        f: Objective function
-        x_range: Range for x-axis
-        y_range: Range for y-axis
-        optimizers: Dictionary of optimizer name to path history
-        save_prefix: Prefix for saving individual plots
-        n_points: Number of points for contour
+        results: Runtime results from benchmark_optimizers
+        save_path: Path to save the figure (optional)
     """
-    for name, path in optimizers.items():
-        fig, ax = plot_2d_contour(
-            f,
-            x_range,
-            y_range,
-            {name: path},
-            title=f"{name} Optimization Path",
-            n_points=n_points,
-        )
+    plt.figure(figsize=(12, 8))
 
-        if save_prefix:
-            plt.savefig(
-                f"{save_prefix}_{name.lower()}.png", dpi=300, bbox_inches="tight"
-            )
+    dimensions = sorted(next(iter(results.values())).keys())
 
-        plt.show()
-        plt.close()
+    # Plot actual runtimes
+    for algorithm, data in results.items():
+        means = [np.mean(data[dim]) for dim in dimensions]
+        plt.plot(dimensions, means, "o-", label=algorithm, linewidth=2, markersize=8)
 
+    # Add theoretical complexity lines
+    dim_array = np.array(dimensions)
 
-def rosenbrock(x,a=1.0, b=10.0):
-    """Rosenbrock function: f(x,y) = (a-x)^2 + b(y-x^2)^2"""
-    return (a - x[0]) ** 2 + b * (x[1] - x[0] ** 2) ** 2
+    # Newton: O(n^3) for matrix inversion
+    newton_theoretical = (
+        dim_array**3 / (dimensions[0] ** 3) * np.mean(results["Newton"][dimensions[0]])
+    )
+    plt.plot(dimensions, newton_theoretical, "--", label="O(n³) theoretical", alpha=0.7)
 
+    # BFGS: O(n^2) for matrix updates
+    bfgs_theoretical = (
+        dim_array**2 / (dimensions[0] ** 2) * np.mean(results["BFGS"][dimensions[0]])
+    )
+    plt.plot(dimensions, bfgs_theoretical, "--", label="O(n²) theoretical", alpha=0.7)
 
-def rosenbrock_gradient(x, a=1.0, b=10.0):
-    """Gradient of the Rosenbrock function"""
-    dx = -2 * (a - x[0]) - 4 * b * x[0] * (x[1] - x[0] ** 2)
-    dy = 2 * b * (x[1] - x[0] ** 2)
-    return np.array([dx, dy])
+    # L-BFGS: O(n) for two-loop recursion
+    lbfgs_theoretical = (
+        dim_array / dimensions[0] * np.mean(results["L-BFGS"][dimensions[0]])
+    )
+    plt.plot(dimensions, lbfgs_theoretical, "--", label="O(n) theoretical", alpha=0.7)
+
+    plt.xlabel("Dimension", fontsize=14)
+    plt.ylabel("Runtime (seconds)", fontsize=14)
+    plt.title("Runtime Scaling Analysis", fontsize=16, pad=20)
+    plt.legend(fontsize=12)
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    plt.show()
 
 
 if __name__ == "__main__":
+
+    def rosenbrock(x, a=1.0, b=10.0):
+        """Rosenbrock function: f(x,y) = (a-x)^2 + b(y-x^2)^2"""
+        return (a - x[0]) ** 2 + b * (x[1] - x[0] ** 2) ** 2
+
+    def rosenbrock_gradient(x, a=1.0, b=10.0):
+        """Gradient of the Rosenbrock function"""
+        dx = -2 * (a - x[0]) - 4 * b * x[0] * (x[1] - x[0] ** 2)
+        dy = 2 * b * (x[1] - x[0] ** 2)
+        return np.array([dx, dy])
+
     import bfgs as bfgs
     import lbfgs as lbfgs
     import newton as newton
+
     initial_point = np.array([-1.5, 2.0])
 
-    optimizer = bfgs.BFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
-    optimal_point, optimal_value, history_x, history_f = optimizer.optimize(
-        initial_point
-    )
-    fig, ax = plot_contour_2d(
-        history_x, rosenbrock, "BFGS"
-    )
+    bfgs_optimizer = bfgs.BFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
+    #     bfgs_optimal_point, bfgs_optimal_value, bfgs_history_x, bfgs_history_f = bfgs_optimizer.optimize(
+    #         initial_point
+    #     )
+    #     bfgs_fig, bfgs_ax = plot_contour_2d(
+    #         bfgs_history_x, rosenbrock, "BFGS",save=True
+    #     )
 
-    optimizer = lbfgs.LBFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
-    optimal_point, optimal_value, history_x, history_f = optimizer.optimize(
-        initial_point
-    )
-    fig, ax = plot_contour_2d(
-        history_x,
-        rosenbrock,
-        "L-BFGS",
-    )
+    lbfgs_optimizer = lbfgs.LBFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
+    #     lbfgs_optimal_point, lbfgs_optimal_value, lbfgs_history_x, lbfgs_history_f = lbfgs_optimizer.optimize(
+    #         initial_point
+    #     )
+    #     lbfgs_fig, lbfgs_ax = plot_contour_2d(
+    #         lbfgs_history_x,
+    #         rosenbrock,
+    #         "L-BFGS",
+    #         save=True
+    #     )
 
-    optimizer = newton.Newton(rosenbrock, rosenbrock_gradient, max_iter=100)
-    optimal_point, optimal_value, history_x, history_f = optimizer.optimize(
-        initial_point
-    )
-    fig, ax = plot_contour_2d(
-        history_x, rosenbrock, "Newton's Method"
-    )
+    newton_optimizer = newton.Newton(rosenbrock, rosenbrock_gradient, max_iter=100)
+    #     newton_optimal_point, newton_optimal_value, newton_history_x, newton_history_f = newton_optimizer.optimize(
+    #         initial_point
+    #     )
+    #     newton_fig, newton_ax = plot_contour_2d(
+    #         newton_history_x, rosenbrock, "Newton",save=True
+    #     )
 
-    plt.show()
+    #     bfgs_result = bfgs_optimizer.optimize(initial_point)
+    #     newton_result = newton_optimizer.optimize(initial_point)
+    #     lbfgs_result = lbfgs_optimizer.optimize(initial_point)
+
+    #     results = {
+    #     'BFGS': (bfgs_result),
+    #     'Newton': newton_result,
+    #     'L-BFGS': lbfgs_result
+    # }
+
+    #     plot_loss_comparison(
+    #     results,
+    #     title="Optimization Algorithm Comparison",
+    #     log_scale=True,
+    #     show_convergence_rate=True,
+    #     save_path="./figures/optimization_comparison.png",
+    # )
+    dimensions = [10, 100, 1000, 10000]
+
+    # Run benchmark
+    print("Starting benchmark...")
+    results = benchmark_optimizers(dimensions, n_trials=5, max_iter=100)
+
+    # Create plots
+    plot_runtime_comparison(results, "runtime_comparison.png")
+    plot_runtime_scaling(results, "runtime_scaling.png")
+
+    # Print summary statistics
+    print("\nSummary Statistics:")
+    print("-" * 50)
+    print(f"{'Algorithm':<10} | {'Dim':<5} | {'Mean Time (s)':<15} | {'Std Dev':<10}")
+    print("-" * 50)
+
+    for algorithm in results:
+        for dim in dimensions:
+            times = results[algorithm][dim]
+            mean_time = np.mean(times)
+            std_time = np.std(times)
+            print(
+                f"{algorithm:<10} | {dim:<5} | {mean_time:<15.6f} | {std_time:<10.6f}"
+            )
+        print("-" * 50)
+
+    # Run the comparison
