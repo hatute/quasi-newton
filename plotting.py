@@ -363,7 +363,7 @@ def plot_runtime_comparison(
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
-    plt.show()
+    # plt.show()
 
 
 def plot_runtime_scaling(
@@ -419,28 +419,28 @@ def plot_runtime_scaling(
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
-    plt.show()
+    # plt.show()
 
 
 if __name__ == "__main__":
 
-    def rosenbrock(x, a=1.0, b=10.0):
-        """Rosenbrock function: f(x,y) = (a-x)^2 + b(y-x^2)^2"""
-        return (a - x[0]) ** 2 + b * (x[1] - x[0] ** 2) ** 2
+    # def rosenbrock(x, a=1.0, b=10.0):
+    #     """Rosenbrock function: f(x,y) = (a-x)^2 + b(y-x^2)^2"""
+    #     return (a - x[0]) ** 2 + b * (x[1] - x[0] ** 2) ** 2
 
-    def rosenbrock_gradient(x, a=1.0, b=10.0):
-        """Gradient of the Rosenbrock function"""
-        dx = -2 * (a - x[0]) - 4 * b * x[0] * (x[1] - x[0] ** 2)
-        dy = 2 * b * (x[1] - x[0] ** 2)
-        return np.array([dx, dy])
+    # def rosenbrock_gradient(x, a=1.0, b=10.0):
+    #     """Gradient of the Rosenbrock function"""
+    #     dx = -2 * (a - x[0]) - 4 * b * x[0] * (x[1] - x[0] ** 2)
+    #     dy = 2 * b * (x[1] - x[0] ** 2)
+    #     return np.array([dx, dy])
 
-    import bfgs as bfgs
-    import lbfgs as lbfgs
-    import newton as newton
+    # import bfgs as bfgs
+    # import lbfgs as lbfgs
+    # import newton as newton
 
-    initial_point = np.array([-1.5, 2.0])
+    # initial_point = np.array([-1.5, 2.0])
 
-    bfgs_optimizer = bfgs.BFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
+    # bfgs_optimizer = bfgs.BFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
     #     bfgs_optimal_point, bfgs_optimal_value, bfgs_history_x, bfgs_history_f = bfgs_optimizer.optimize(
     #         initial_point
     #     )
@@ -448,7 +448,7 @@ if __name__ == "__main__":
     #         bfgs_history_x, rosenbrock, "BFGS",save=True
     #     )
 
-    lbfgs_optimizer = lbfgs.LBFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
+    # lbfgs_optimizer = lbfgs.LBFGS(rosenbrock, rosenbrock_gradient, max_iter=100)
     #     lbfgs_optimal_point, lbfgs_optimal_value, lbfgs_history_x, lbfgs_history_f = lbfgs_optimizer.optimize(
     #         initial_point
     #     )
@@ -459,7 +459,7 @@ if __name__ == "__main__":
     #         save=True
     #     )
 
-    newton_optimizer = newton.Newton(rosenbrock, rosenbrock_gradient, max_iter=100)
+    # newton_optimizer = newton.Newton(rosenbrock, rosenbrock_gradient, max_iter=100)
     #     newton_optimal_point, newton_optimal_value, newton_history_x, newton_history_f = newton_optimizer.optimize(
     #         initial_point
     #     )
